@@ -295,24 +295,89 @@ impl ExecCell {
                 .all(|parsed| matches!(parsed, ParsedCommand::Read { .. }));
 
             let call_lines: Vec<(&str, Vec<Span<'static>>)> = if reads_only {
-                let names = call
+                let skills: Vec<String> = call
                     .parsed
                     .iter()
-                    .map(|parsed| match parsed {
-                        ParsedCommand::Read { name, .. } => name.clone(),
+                    .filter_map(|parsed| match parsed {
+                        ParsedCommand::Read { name, path, .. } => {
+                            if name == "SKILL.md" {
+                                let skill_name = path
+                                    .parent()
+                                    .and_then(|p| p.file_name())
+                                    .map(|n| n.to_string_lossy().into_owned())
+                                    .unwrap_or_else(|| name.clone());
+                                Some(skill_name)
+                            } else {
+                                None
+                            }
+                        }
                         _ => unreachable!(),
                     })
-                    .unique();
-                vec![(
-                    "Read",
-                    Itertools::intersperse(names.into_iter().map(Into::into), ", ".dim()).collect(),
-                )]
+                    .unique()
+                    .collect();
+                let files: Vec<String> = call
+                    .parsed
+                    .iter()
+                    .filter_map(|parsed| match parsed {
+                        ParsedCommand::Read { name, .. } => {
+                            if name == "SKILL.md" { None } else { Some(name.clone()) }
+                        }
+                        _ => unreachable!(),
+                    })
+                    .unique()
+                    .collect();
+                let mut lines: Vec<(&str, Vec<Span<'static>>)> = Vec::with_capacity(2);
+                if !skills.is_empty() {
+                    lines.push((
+                        "Skill",
+                        Itertools::intersperse(
+                            skills.into_iter().map(Into::into),
+                            ", ".dim(),
+                        )
+                        .collect(),
+                    ));
+                }
+                if !files.is_empty() {
+                    lines.push((
+                        "File",
+                        Itertools::intersperse(
+                            files.into_iter().map(Into::into),
+                            ", ".dim(),
+                        )
+                        .collect(),
+                    ));
+                }
+                if lines.is_empty() {
+                    let names = call
+                        .parsed
+                        .iter()
+                        .map(|parsed| match parsed {
+                            ParsedCommand::Read { name, .. } => name.clone(),
+                            _ => unreachable!(),
+                        })
+                        .unique();
+                    lines.push((
+                        "Read",
+                        Itertools::intersperse(names.into_iter().map(Into::into), ", ".dim())
+                            .collect(),
+                    ));
+                }
+                lines
             } else {
                 let mut lines = Vec::new();
                 for parsed in &call.parsed {
                     match parsed {
-                        ParsedCommand::Read { name, .. } => {
-                            lines.push(("Read", vec![name.clone().into()]));
+                        ParsedCommand::Read { name, path, .. } => {
+                            if name == "SKILL.md" {
+                                let skill_name = path
+                                    .parent()
+                                    .and_then(|p| p.file_name())
+                                    .map(|n| n.to_string_lossy().into_owned())
+                                    .unwrap_or_else(|| name.clone());
+                                lines.push(("Skill", vec![skill_name.into()]));
+                            } else {
+                                lines.push(("File", vec![name.clone().into()]));
+                            }
                         }
                         ParsedCommand::ListFiles { cmd, path } => {
                             lines.push(("List", vec![path.clone().unwrap_or(cmd.clone()).into()]));
@@ -943,6 +1008,129 @@ mod tests {
             1,
             "expected full URL-like token in one rendered line, got: {rendered:?}"
         );
+    }
+
+    #[test]
+    fn skill_reads_display_skill_name_not_filename() {
+        use std::path::PathBuf;
+        let call = ExecCall {
+            call_id: "call-id".to_string(),
+            command: vec!["bash".into(), "-lc".into(), "cat SKILL.md".into()],
+            parsed: vec![ParsedCommand::Read {
+                cmd: "cat /home/user/.codex/skills/python/SKILL.md".to_string(),
+                name: "SKILL.md".to_string(),
+                path: PathBuf::from("/home/user/.codex/skills/python/SKILL.md"),
+            }],
+            output: None,
+            source: ExecCommandSource::Agent,
+            start_time: None,
+            duration: None,
+            interaction_input: None,
+        };
+
+        let cell = ExecCell::new(call, /*animations_enabled*/ false);
+        let rendered: Vec<String> = cell
+            .display_lines(/*width*/ 80)
+            .iter()
+            .map(|line| {
+                line.spans
+                    .iter()
+                    .map(|span| span.content.as_ref())
+                    .collect::<String>()
+            })
+            .collect();
+        let full_text = rendered.join("\n");
+
+        assert!(
+            full_text.contains("Skill"),
+            "expected 'Skill' label in output, got: {rendered:?}"
+        );
+        assert!(
+            full_text.contains("python"),
+            "expected skill name 'python' in output, got: {rendered:?}"
+        );
+        assert!(
+            !full_text.contains("SKILL.md"),
+            "expected 'SKILL.md' to not appear in output, got: {rendered:?}"
+        );
+    }
+
+    #[test]
+    fn mixed_skill_and_regular_reads_display_both_labels() {
+        use std::path::PathBuf;
+        let call = ExecCall {
+            call_id: "call-id".to_string(),
+            command: vec!["bash".into(), "-lc".into(), "cat files".into()],
+            parsed: vec![
+                ParsedCommand::Read {
+                    cmd: "cat /home/user/.codex/skills/docx/SKILL.md".to_string(),
+                    name: "SKILL.md".to_string(),
+                    path: PathBuf::from("/home/user/.codex/skills/docx/SKILL.md"),
+                },
+                ParsedCommand::Read {
+                    cmd: "cat src/main.rs".to_string(),
+                    name: "main.rs".to_string(),
+                    path: PathBuf::from("src/main.rs"),
+                },
+            ],
+            output: None,
+            source: ExecCommandSource::Agent,
+            start_time: None,
+            duration: None,
+            interaction_input: None,
+        };
+
+        let cell = ExecCell::new(call, /*animations_enabled*/ false);
+        let rendered: Vec<String> = cell
+            .display_lines(/*width*/ 80)
+            .iter()
+            .map(|line| {
+                line.spans
+                    .iter()
+                    .map(|span| span.content.as_ref())
+                    .collect::<String>()
+            })
+            .collect();
+        let full_text = rendered.join("\n");
+
+        assert!(full_text.contains("Skill"), "missing 'Skill' label");
+        assert!(full_text.contains("docx"), "missing skill name 'docx'");
+        assert!(full_text.contains("File"), "missing 'File' label");
+        assert!(full_text.contains("main.rs"), "missing regular file name");
+    }
+
+    #[test]
+    fn skill_read_with_bare_path_falls_back_gracefully() {
+        use std::path::PathBuf;
+        let call = ExecCall {
+            call_id: "call-id".to_string(),
+            command: vec!["bash".into(), "-lc".into(), "cat SKILL.md".into()],
+            parsed: vec![ParsedCommand::Read {
+                cmd: "cat SKILL.md".to_string(),
+                name: "SKILL.md".to_string(),
+                path: PathBuf::from("SKILL.md"),
+            }],
+            output: None,
+            source: ExecCommandSource::Agent,
+            start_time: None,
+            duration: None,
+            interaction_input: None,
+        };
+
+        let cell = ExecCell::new(call, /*animations_enabled*/ false);
+        // Should not panic and should produce non-empty output
+        let rendered: Vec<String> = cell
+            .display_lines(/*width*/ 80)
+            .iter()
+            .map(|line| {
+                line.spans
+                    .iter()
+                    .map(|span| span.content.as_ref())
+                    .collect::<String>()
+            })
+            .collect();
+
+        assert!(!rendered.is_empty(), "expected non-empty output");
     }
 
     #[test]
