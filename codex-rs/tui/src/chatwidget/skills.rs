@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 use std::path::Path;
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use super::ChatWidget;
 use crate::app_event::AppEvent;
@@ -198,6 +199,21 @@ fn protocol_skill_to_core(skill: &ProtocolSkillMetadata) -> SkillMetadata {
 
 fn normalize_skill_config_path(path: &Path) -> PathBuf {
     dunce::canonicalize(path).unwrap_or_else(|_| path.to_path_buf())
+}
+
+pub(super) fn build_skill_name_map(
+    skills: &[ProtocolSkillMetadata],
+) -> Arc<HashMap<PathBuf, String>> {
+    let map = skills
+        .iter()
+        .map(|skill| {
+            let core = protocol_skill_to_core(skill);
+            let name = skill_display_name(&core).to_string();
+            let path = normalize_skill_config_path(&skill.path);
+            (path, name)
+        })
+        .collect();
+    Arc::new(map)
 }
 
 pub(crate) fn collect_tool_mentions(

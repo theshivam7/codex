@@ -1,3 +1,6 @@
+use std::collections::HashMap;
+use std::path::PathBuf;
+use std::sync::Arc;
 use std::time::Instant;
 
 use super::model::CommandOutput;
@@ -44,6 +47,7 @@ pub(crate) fn new_active_exec_command(
     source: ExecCommandSource,
     interaction_input: Option<String>,
     animations_enabled: bool,
+    skill_name_map: Arc<HashMap<PathBuf, String>>,
 ) -> ExecCell {
     ExecCell::new(
         ExecCall {
@@ -57,6 +61,7 @@ pub(crate) fn new_active_exec_command(
             interaction_input,
         },
         animations_enabled,
+        skill_name_map,
     )
 }
 
@@ -299,7 +304,14 @@ impl ExecCell {
                     .parsed
                     .iter()
                     .map(|parsed| match parsed {
-                        ParsedCommand::Read { name, .. } => name.clone(),
+                        ParsedCommand::Read { name, path, .. } => {
+                            let key = dunce::canonicalize(path)
+                                .unwrap_or_else(|_| path.clone());
+                            self.skill_name_map
+                                .get(&key)
+                                .cloned()
+                                .unwrap_or_else(|| name.clone())
+                        }
                         _ => unreachable!(),
                     })
                     .unique();
@@ -311,8 +323,15 @@ impl ExecCell {
                 let mut lines = Vec::new();
                 for parsed in &call.parsed {
                     match parsed {
-                        ParsedCommand::Read { name, .. } => {
-                            lines.push(("Read", vec![name.clone().into()]));
+                        ParsedCommand::Read { name, path, .. } => {
+                            let key = dunce::canonicalize(path)
+                                .unwrap_or_else(|_| path.clone());
+                            let display = self
+                                .skill_name_map
+                                .get(&key)
+                                .cloned()
+                                .unwrap_or_else(|| name.clone());
+                            lines.push(("Read", vec![display.into()]));
                         }
                         ParsedCommand::ListFiles { cmd, path } => {
                             lines.push(("List", vec![path.clone().unwrap_or(cmd.clone()).into()]));
@@ -692,6 +711,10 @@ mod tests {
     use codex_protocol::protocol::ExecCommandSource;
     use pretty_assertions::assert_eq;
 
+    fn empty_skill_map() -> Arc<HashMap<PathBuf, String>> {
+        Arc::new(HashMap::new())
+    }
+
     #[test]
     fn user_shell_output_is_limited_by_screen_lines() {
         let long_url_like = format!(
@@ -758,7 +781,7 @@ mod tests {
             interaction_input: None,
         };
 
-        let cell = ExecCell::new(call, /*animations_enabled*/ false);
+        let cell = ExecCell::new(call, /*animations_enabled*/ false, empty_skill_map());
 
         // Use a narrow width so each logical line wraps into many on-screen lines.
         let lines = cell.command_display_lines(width);
@@ -848,7 +871,7 @@ mod tests {
             interaction_input: None,
         };
 
-        let cell = ExecCell::new(call, /*animations_enabled*/ false);
+        let cell = ExecCell::new(call, /*animations_enabled*/ false, empty_skill_map());
         let rendered: Vec<String> = cell
             .command_display_lines(/*width*/ 36)
             .iter()
@@ -885,7 +908,7 @@ mod tests {
             interaction_input: None,
         };
 
-        let cell = ExecCell::new(call, /*animations_enabled*/ false);
+        let cell = ExecCell::new(call, /*animations_enabled*/ false, empty_skill_map());
         let rendered: Vec<String> = cell
             .display_lines(/*width*/ 36)
             .iter()
@@ -926,7 +949,7 @@ mod tests {
             interaction_input: None,
         };
 
-        let cell = ExecCell::new(call, /*animations_enabled*/ false);
+        let cell = ExecCell::new(call, /*animations_enabled*/ false, empty_skill_map());
         let rendered: Vec<String> = cell
             .command_display_lines(/*width*/ 36)
             .iter()
@@ -963,7 +986,7 @@ mod tests {
             interaction_input: None,
         };
 
-        let cell = ExecCell::new(call, /*animations_enabled*/ false);
+        let cell = ExecCell::new(call, /*animations_enabled*/ false, empty_skill_map());
         let width: u16 = 36;
         let logical_height = cell.transcript_lines(width).len() as u16;
         let wrapped_height = cell.desired_transcript_height(width);

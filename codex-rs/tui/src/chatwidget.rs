@@ -353,6 +353,7 @@ use self::interrupts::InterruptManager;
 mod session_header;
 use self::session_header::SessionHeader;
 mod skills;
+use self::skills::build_skill_name_map;
 use self::skills::collect_tool_mentions;
 use self::skills::find_app_mentions;
 use self::skills::find_skill_mentions_with_tool_mentions;
@@ -4266,6 +4267,7 @@ impl ChatWidget {
                     source,
                     ev.interaction_input.clone(),
                     self.config.animations,
+                    build_skill_name_map(&self.skills_all),
                 );
                 let completed = orphan.complete_call(&ev.call_id, output, ev.duration);
                 debug_assert!(
@@ -4287,6 +4289,7 @@ impl ChatWidget {
                     source,
                     ev.interaction_input.clone(),
                     self.config.animations,
+                    build_skill_name_map(&self.skills_all),
                 );
                 let completed = cell.complete_call(&ev.call_id, output, ev.duration);
                 debug_assert!(completed, "new exec cell should contain {}", ev.call_id);
@@ -4479,6 +4482,7 @@ impl ChatWidget {
                 ev.source,
                 interaction_input,
                 self.config.animations,
+                build_skill_name_map(&self.skills_all),
             )));
             self.bump_active_cell_revision();
         }

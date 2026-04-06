@@ -2768,6 +2768,7 @@ mod tests {
     use crate::exec_cell::CommandOutput;
     use crate::exec_cell::ExecCall;
     use crate::exec_cell::ExecCell;
+    use std::sync::Arc;
     use codex_config::types::McpServerConfig;
     use codex_config::types::McpServerDisabledReason;
     use codex_core::config::Config;
@@ -2792,6 +2793,10 @@ mod tests {
     use codex_protocol::mcp::Tool;
     use codex_protocol::protocol::ExecCommandSource;
     use rmcp::model::Content;
+
+    fn empty_skill_map() -> Arc<HashMap<PathBuf, String>> {
+        Arc::new(HashMap::new())
+    }
 
     const SMALL_PNG_BASE64: &str = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg==";
     async fn test_config() -> Config {
@@ -3948,6 +3953,7 @@ mod tests {
                 interaction_input: None,
             },
             /*animations_enabled*/ true,
+            empty_skill_map(),
         );
         // Mark call complete so markers are ✓
         cell.complete_call(&call_id, CommandOutput::default(), Duration::from_millis(1));
@@ -3975,6 +3981,7 @@ mod tests {
                 interaction_input: None,
             },
             /*animations_enabled*/ true,
+            empty_skill_map(),
         );
         // Call 1: Search only
         cell.complete_call("c1", CommandOutput::default(), Duration::from_millis(1));
@@ -4044,6 +4051,7 @@ mod tests {
                 interaction_input: None,
             },
             /*animations_enabled*/ true,
+            empty_skill_map(),
         );
         cell.complete_call("c1", CommandOutput::default(), Duration::from_millis(1));
         let lines = cell.display_lines(/*width*/ 80);
@@ -4068,6 +4076,7 @@ mod tests {
                 interaction_input: None,
             },
             /*animations_enabled*/ true,
+            empty_skill_map(),
         );
         // Mark call complete so it renders as "Ran"
         cell.complete_call(&call_id, CommandOutput::default(), Duration::from_millis(1));
@@ -4094,6 +4103,7 @@ mod tests {
                 interaction_input: None,
             },
             /*animations_enabled*/ true,
+            empty_skill_map(),
         );
         cell.complete_call(&call_id, CommandOutput::default(), Duration::from_millis(1));
         // Wide enough that it fits inline
@@ -4118,6 +4128,7 @@ mod tests {
                 interaction_input: None,
             },
             /*animations_enabled*/ true,
+            empty_skill_map(),
         );
         cell.complete_call(&call_id, CommandOutput::default(), Duration::from_millis(1));
         let lines = cell.display_lines(/*width*/ 24);
@@ -4141,6 +4152,7 @@ mod tests {
                 interaction_input: None,
             },
             /*animations_enabled*/ true,
+            empty_skill_map(),
         );
         cell.complete_call(&call_id, CommandOutput::default(), Duration::from_millis(1));
         let lines = cell.display_lines(/*width*/ 80);
@@ -4165,6 +4177,7 @@ mod tests {
                 interaction_input: None,
             },
             /*animations_enabled*/ true,
+            empty_skill_map(),
         );
         cell.complete_call(&call_id, CommandOutput::default(), Duration::from_millis(1));
         let lines = cell.display_lines(/*width*/ 28);
@@ -4189,6 +4202,7 @@ mod tests {
                 interaction_input: None,
             },
             /*animations_enabled*/ true,
+            empty_skill_map(),
         );
         let stderr: String = (1..=10)
             .map(|n| n.to_string())
@@ -4239,6 +4253,7 @@ mod tests {
                 interaction_input: None,
             },
             /*animations_enabled*/ true,
+            empty_skill_map(),
         );
 
         let stderr = "error: first line on stderr\nerror: second line on stderr".to_string();

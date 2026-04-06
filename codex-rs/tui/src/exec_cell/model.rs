@@ -5,6 +5,9 @@
 //! end events into the right cell, and it treats "call id not found" as a real signal (for
 //! example, an orphan end that should render as a separate history entry).
 
+use std::collections::HashMap;
+use std::path::PathBuf;
+use std::sync::Arc;
 use std::time::Duration;
 use std::time::Instant;
 
@@ -36,13 +39,19 @@ pub(crate) struct ExecCall {
 pub(crate) struct ExecCell {
     pub(crate) calls: Vec<ExecCall>,
     animations_enabled: bool,
+    pub(crate) skill_name_map: Arc<HashMap<PathBuf, String>>,
 }
 
 impl ExecCell {
-    pub(crate) fn new(call: ExecCall, animations_enabled: bool) -> Self {
+    pub(crate) fn new(
+        call: ExecCall,
+        animations_enabled: bool,
+        skill_name_map: Arc<HashMap<PathBuf, String>>,
+    ) -> Self {
         Self {
             calls: vec![call],
             animations_enabled,
+            skill_name_map,
         }
     }
 
@@ -68,6 +77,7 @@ impl ExecCell {
             Some(Self {
                 calls: [self.calls.clone(), vec![call]].concat(),
                 animations_enabled: self.animations_enabled,
+                skill_name_map: Arc::clone(&self.skill_name_map),
             })
         } else {
             None
